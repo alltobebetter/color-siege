@@ -121,7 +121,7 @@ export default function LobbyPage() {
             <p className="text-xs text-text-dim">
               <span style={{ color: "#4a6cf7" }}>{user.nickname}</span>
               {user.isGuest && (
-                <span className="ml-1 text-text-dim">/ 游客</span>
+                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-surface2 text-text-dim">游客</span>
               )}
             </p>
           </div>
@@ -187,6 +187,14 @@ export default function LobbyPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-3 text-xs text-text-dim">
+          <a href="/docs/how-to-play" className="hover:text-text-main transition-colors">如何游玩</a>
+          <span>/</span>
+          <a href="/docs/privacy" className="hover:text-text-main transition-colors">隐私政策</a>
+          <span>/</span>
+          <a href="/docs/terms" className="hover:text-text-main transition-colors">服务条款</a>
         </div>
 
         <p className="text-center text-xs text-text-dim">

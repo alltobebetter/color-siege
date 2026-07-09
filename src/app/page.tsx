@@ -171,6 +171,16 @@ export default function LoginPage() {
           游客登录
         </button>
 
+        <div className="flex items-center justify-center gap-3 text-xs text-text-dim">
+          <a href="/docs" className="hover:text-text-main transition-colors">文档</a>
+          <span>/</span>
+          <a href="/docs/how-to-play" className="hover:text-text-main transition-colors">如何游玩</a>
+          <span>/</span>
+          <a href="/docs/privacy" className="hover:text-text-main transition-colors">隐私政策</a>
+          <span>/</span>
+          <a href="/docs/terms" className="hover:text-text-main transition-colors">服务条款</a>
+        </div>
+
         <p className="text-center text-xs text-text-dim">
           在线联机 / 双人对战
         </p>

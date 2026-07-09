@@ -314,20 +314,33 @@ export class GameRenderer {
 
     ctx.fillStyle = resultColor;
     ctx.font = 'bold 36px "Unifont", monospace';
-    ctx.fillText(resultText, CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 25);
+    ctx.fillText(resultText, CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 30);
 
-    // 比分
-    ctx.fillStyle = "#d4d4dc";
+    // 比分 — 始终显示，即使玩家已退出
     ctx.font = '14px "Unifont", monospace';
     const p1 = state.players[1];
     const p2 = state.players[2];
-    if (p1 && p2) {
-      ctx.fillStyle = PLAYER_COLORS[1].main;
-      ctx.fillText(`${p1.name}  ${this.countCells(state, 1)}`, CANVAS_SIZE / 2 - 60, CANVAS_SIZE / 2 + 20);
+    const p1Score = this.countCells(state, 1);
+    const p2Score = this.countCells(state, 2);
+
+    const p1Name = p1 ? p1.name : "(已退出)";
+    const p2Name = p2 ? p2.name : "(已退出)";
+
+    // P1 名字 + 分数
+    ctx.fillStyle = PLAYER_COLORS[1].main;
+    ctx.fillText(`${p1Name}  ${p1Score}`, CANVAS_SIZE / 2 - 70, CANVAS_SIZE / 2 + 15);
+    // 分隔
+    ctx.fillStyle = "#6b6b78";
+    ctx.fillText(":", CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 15);
+    // P2 分数 + 名字
+    ctx.fillStyle = PLAYER_COLORS[2].main;
+    ctx.fillText(`${p2Score}  ${p2Name}`, CANVAS_SIZE / 2 + 70, CANVAS_SIZE / 2 + 15);
+
+    // 如果有人退出，显示提示
+    if (!p1 || !p2) {
       ctx.fillStyle = "#6b6b78";
-      ctx.fillText(":", CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 20);
-      ctx.fillStyle = PLAYER_COLORS[2].main;
-      ctx.fillText(`${this.countCells(state, 2)}  ${p2.name}`, CANVAS_SIZE / 2 + 60, CANVAS_SIZE / 2 + 20);
+      ctx.font = '11px "Unifont", monospace';
+      ctx.fillText("对手已断开连接", CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 45);
     }
   }
 
