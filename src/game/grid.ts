@@ -1,4 +1,4 @@
-import { GRID_SIZE, getObstacleLayout } from "./constants";
+import { GRID_SIZE, generateObstacleLayout } from "./constants";
 import type { Grid, CellOwner, PlayerColor, ScoreInfo } from "./types";
 
 /** 创建初始空网格 */
@@ -8,10 +8,10 @@ export function createEmptyGrid(): Grid {
   );
 }
 
-/** 创建带障碍物的初始网格 */
+/** 创建带障碍物的初始网格（随机障碍） */
 export function createInitialGrid(): Grid {
   const grid = createEmptyGrid();
-  for (const { x, y } of getObstacleLayout()) {
+  for (const { x, y } of generateObstacleLayout()) {
     grid[y][x] = -1;
   }
   return grid;

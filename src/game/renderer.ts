@@ -41,8 +41,20 @@ export class GameRenderer {
         const py = y * CELL_SIZE;
 
         if (cell === -1) {
+          // 障碍物 — 更显眼的渲染
           ctx.fillStyle = PLAYER_COLORS.obstacle;
           ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+          // 内部高亮边框
+          ctx.strokeStyle = PLAYER_COLORS.obstacleBorder;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px + 2.5, py + 2.5, CELL_SIZE - 5, CELL_SIZE - 5);
+          // 对角线纹理
+          ctx.strokeStyle = "rgba(90,90,110,0.4)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(px + 3, py + 3);
+          ctx.lineTo(px + CELL_SIZE - 3, py + CELL_SIZE - 3);
+          ctx.stroke();
         } else if (cell === 1) {
           ctx.fillStyle = PLAYER_COLORS[1].main;
           ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);

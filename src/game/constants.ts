@@ -59,7 +59,8 @@ export const PLAYER_INIT_DIR = {
 export const PLAYER_COLORS = {
   1: { main: "#e8475a", glow: "#e8475a", light: "#f06878" },
   2: { main: "#4a6cf7", glow: "#4a6cf7", light: "#6a8af9" },
-  obstacle: "#2a2a36",
+  obstacle: "#3a3a4a",
+  obstacleBorder: "#5a5a6e",
   empty: "#18181f",
   emptyLight: "#1c1c26",
 };
@@ -88,25 +89,90 @@ export const DIR_VECTORS = {
   right: { dx: 1, dy: 0 },
 } as const;
 
-/** 障碍物布局（地图中央的固定障碍物） */
-export function getObstacleLayout(): Array<{ x: number; y: number }> {
+/** 障碍物最小安全距离（距玩家初始位置） */
+export const OBSTACLE_SAFE_RADIUS = 3;
+
+/**
+ * 随机生成障碍物布局
+ * 规则：
+ * - 避开玩家初始位置周围（安全区）
+ * - 避开地图边缘（边缘障碍无意义）
+ * - 以簇的形式生成，每簇 2-4 个格子
+ * - 保证地图可通行（不会完全阻断路径）
+ */
+export function generateObstacleLayout(): Array<{ x: number; y: number }> {
   const obstacles: Array<{ x: number; y: number }> = [];
+  const occupied = new Set<string>();
   const mid = Math.floor(GRID_SIZE / 2);
 
-  // 中央十字形障碍物
-  for (let i = -2; i <= 2; i++) {
-    obstacles.push({ x: mid + i, y: mid });
-    obstacles.push({ x: mid, y: mid + i });
+  // 玩家安全区
+  const safeZones = [
+    PLAYER_INIT[1],
+    PLAYER_INIT[2],
+  ];
+
+  const isSafe = (x: number, y: number) => {
+    for (const sz of safeZones) {
+      const dx = x - sz.x;
+      const dy = y - sz.y;
+      if (dx * dx + dy * dy <= OBSTACLE_SAFE_RADIUS * OBSTACLE_SAFE_RADIUS) return true;
+    }
+    return false;
+  };
+
+  // 边缘区域不生成
+  const isEdge = (x: number, y: number) =>
+    x <= 1 || x >= GRID_SIZE - 2 || y <= 1 || y >= GRID_SIZE - 2;
+
+  const tryAdd = (x: number, y: number) => {
+    const key = `${x},${y}`;
+    if (occupied.has(key)) return false;
+    if (isSafe(x, y) || isEdge(x, y)) return false;
+    obstacles.push({ x, y });
+    occupied.add(key);
+    return true;
+  };
+
+  // 1. 中央随机簇（1-3 个簇）
+  const centerClusters = 1 + Math.floor(Math.random() * 3);
+  for (let c = 0; c < centerClusters; c++) {
+    const cx = mid + Math.floor(Math.random() * 7) - 3;
+    const cy = mid + Math.floor(Math.random() * 7) - 3;
+    const size = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < size; i++) {
+      const dx = Math.floor(Math.random() * 3) - 1;
+      const dy = Math.floor(Math.random() * 3) - 1;
+      tryAdd(cx + dx, cy + dy);
+    }
   }
 
-  // 四角小障碍
-  const corners = [
-    { x: 5, y: 5 }, { x: 6, y: 5 },
-    { x: GRID_SIZE - 6, y: 5 }, { x: GRID_SIZE - 7, y: 5 },
-    { x: 5, y: GRID_SIZE - 6 }, { x: 6, y: GRID_SIZE - 6 },
-    { x: GRID_SIZE - 6, y: GRID_SIZE - 6 }, { x: GRID_SIZE - 7, y: GRID_SIZE - 6 },
+  // 2. 四象限随机簇
+  const quadrants = [
+    { qx: Math.floor(GRID_SIZE * 0.3), qy: Math.floor(GRID_SIZE * 0.3) },
+    { qx: Math.floor(GRID_SIZE * 0.7), qy: Math.floor(GRID_SIZE * 0.3) },
+    { qx: Math.floor(GRID_SIZE * 0.3), qy: Math.floor(GRID_SIZE * 0.7) },
+    { qx: Math.floor(GRID_SIZE * 0.7), qy: Math.floor(GRID_SIZE * 0.7) },
   ];
-  obstacles.push(...corners);
+  for (const q of quadrants) {
+    if (Math.random() < 0.7) {
+      const cx = q.qx + Math.floor(Math.random() * 3) - 1;
+      const cy = q.qy + Math.floor(Math.random() * 3) - 1;
+      const size = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < size; i++) {
+        const dx = Math.floor(Math.random() * 3) - 1;
+        const dy = Math.floor(Math.random() * 3) - 1;
+        tryAdd(cx + dx, cy + dy);
+      }
+    }
+  }
+
+  // 3. 随机散点（少量）
+  const scatter = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < scatter; i++) {
+    const x = 3 + Math.floor(Math.random() * (GRID_SIZE - 6));
+    const y = 3 + Math.floor(Math.random() * (GRID_SIZE - 6));
+    tryAdd(x, y);
+  }
 
   return obstacles;
 }
