@@ -71,13 +71,63 @@ export class GameRenderer {
       ctx.stroke();
     }
 
+    const now = Date.now();
+
+    // 检测刚冲刺的玩家（600ms 内）
+    const recentDash = new Map<PlayerColor, number>();
+    for (const eff of state.effects) {
+      if (eff.type === "dash" && eff.color) {
+        const age = now - eff.startTime;
+        if (age < 600) {
+          const existing = recentDash.get(eff.color as PlayerColor);
+          if (existing === undefined || age < existing) {
+            recentDash.set(eff.color as PlayerColor, age);
+          }
+        }
+      }
+    }
+
+    // 护盾 & 冲刺 — 在己方所有格子上绘制效果
+    for (let c = 1 as PlayerColor; c <= 2; c = (c + 1) as PlayerColor) {
+      const p = state.players[c as 1 | 2];
+      if (!p) continue;
+
+      const hasShield = p.shieldUntil > now;
+      const dashAge = recentDash.get(c);
+      const hasDash = dashAge !== undefined;
+
+      if (!hasShield && !hasDash) continue;
+
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          if (state.grid[y][x] !== c) continue;
+          const px = x * CELL_SIZE;
+          const py = y * CELL_SIZE;
+
+          // 护盾 — 金色脉动边框
+          if (hasShield) {
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+            ctx.strokeStyle = `rgba(240, 192, 80, ${0.5 + 0.4 * pulse})`;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(px + 1.5, py + 1.5, CELL_SIZE - 3, CELL_SIZE - 3);
+          }
+
+          // 冲刺 — 白色闪光渐隐
+          if (hasDash) {
+            const alpha = (1 - dashAge / 600) * 0.25;
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+          }
+        }
+      }
+    }
+
     // 道具
     for (const pu of state.powerUps) {
       this.drawPowerUp(pu.x, pu.y, pu.type);
     }
 
     // 特效
-    const now = Date.now();
     for (const eff of state.effects) {
       const age = now - eff.startTime;
       if (age > 1500) continue;
@@ -88,7 +138,7 @@ export class GameRenderer {
     for (let c = 1 as PlayerColor; c <= 2; c = (c + 1) as PlayerColor) {
       const p = state.players[c as 1 | 2];
       if (!p) continue;
-      this.drawPlayer(p.x, p.y, c as PlayerColor, p.shieldUntil > now, p.dir);
+      this.drawPlayer(p.x, p.y, c as PlayerColor, p.shieldUntil > now, p.dir, recentDash.get(c));
     }
 
     // 状态遮罩
@@ -103,13 +153,32 @@ export class GameRenderer {
 
   drawPlayer(
     gx: number, gy: number,
-    color: PlayerColor, hasShield: boolean, dir: string
+    color: PlayerColor, hasShield: boolean, dir: string,
+    dashAge?: number
   ) {
     const { ctx } = this;
     const cx = gx * CELL_SIZE + CELL_SIZE / 2;
     const cy = gy * CELL_SIZE + CELL_SIZE / 2;
     const r = CELL_SIZE * 0.35;
     const colors = PLAYER_COLORS[color];
+
+    // 冲刺速度光环
+    if (dashAge !== undefined) {
+      const intensity = 1 - dashAge / 600;
+      const auraR = r * (1.4 + intensity * 0.6);
+      ctx.globalAlpha = intensity * 0.35;
+      ctx.fillStyle = colors.light;
+      ctx.fillRect(cx - auraR, cy - auraR, auraR * 2, auraR * 2);
+      ctx.globalAlpha = 1;
+    }
+
+    // 护盾 — 金色脉动光环
+    if (hasShield) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.006);
+      ctx.strokeStyle = `rgba(240, 192, 80, ${0.6 + 0.4 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx - r - 3, cy - r - 3, r * 2 + 6, r * 2 + 6);
+    }
 
     // 主体 — 方块而非圆形，更像素风
     ctx.fillStyle = colors.main;
@@ -128,13 +197,6 @@ export class GameRenderer {
     else if (dir === "left") dx = -off;
     else if (dir === "right") dx = off;
     ctx.fillRect(cx + dx - 2, cy + dy - 2, 4, 4);
-
-    // 护盾 — 简单方框
-    if (hasShield) {
-      ctx.strokeStyle = "#48b0d8";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(cx - r - 3, cy - r - 3, r * 2 + 6, r * 2 + 6);
-    }
   }
 
   drawPowerUp(gx: number, gy: number, type: string) {
