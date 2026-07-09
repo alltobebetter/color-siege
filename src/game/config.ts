@@ -1,12 +1,11 @@
 /**
  * 共享配置
- * 将来接入登录系统时，这里可以扩展用户认证相关配置
  */
-export const PARTY_HOST =
-  process.env.NEXT_PUBLIC_PARTYKIT_HOST ||
+export const WS_HOST =
+  process.env.NEXT_PUBLIC_WS_HOST ||
   (typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "127.0.0.1:1999"
-    : "color-siege.your-name.partykit.dev");
+    ? "localhost:8787"
+    : "color-siege.alltobebetter.workers.dev");
 
 /**
  * 生成游客昵称

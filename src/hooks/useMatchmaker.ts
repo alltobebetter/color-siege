@@ -1,6 +1,5 @@
-import { PartySocket } from "partysocket";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PARTY_HOST } from "../game/config";
+import { WS_HOST } from "../game/config";
 
 export type MatchStatus = "idle" | "searching" | "matched" | "error";
 
@@ -13,18 +12,15 @@ export function useMatchmaker() {
   const [status, setStatus] = useState<MatchStatus>("idle");
   const [result, setResult] = useState<MatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<PartySocket | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const startMatch = useCallback((name: string) => {
     setStatus("searching");
     setError(null);
     setResult(null);
 
-    const socket = new PartySocket({
-      host: PARTY_HOST,
-      room: "lobby",
-      party: "matchmaker",
-    });
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${protocol}//${WS_HOST}/matchmaker`);
 
     socket.addEventListener("open", () => {
       socket.send(JSON.stringify({ type: "queue", name }));

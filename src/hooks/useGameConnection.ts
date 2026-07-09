@@ -1,7 +1,6 @@
-import { PartySocket } from "partysocket";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientMessage, ServerMessage, SerializedState } from "../game/types";
-import { PARTY_HOST } from "../game/config";
+import { WS_HOST } from "../game/config";
 
 export interface GameConnection {
   state: SerializedState | null;
@@ -16,7 +15,7 @@ export function useGameConnection(roomId: string, playerName: string): GameConne
   const [myColor, setMyColor] = useState<1 | 2 | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<PartySocket | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const hasConnectedRef = useRef(false);
 
   // 用 ref 保存最新的 playerName，供 open 回调读取
@@ -30,10 +29,8 @@ export function useGameConnection(roomId: string, playerName: string): GameConne
     if (hasConnectedRef.current) return;
     hasConnectedRef.current = true;
 
-    const socket = new PartySocket({
-      host: PARTY_HOST,
-      room: roomId,
-    });
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${protocol}//${WS_HOST}/room/${roomId}`);
 
     const doJoin = () => {
       setConnected(true);
