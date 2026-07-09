@@ -1,4 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
+import { DurableObject } from "cloudflare:workers";
 
 interface QueuedPlayer {
   id: string;
@@ -6,12 +6,11 @@ interface QueuedPlayer {
   name: string;
 }
 
-export class Matchmaker {
-  state: DurableObjectState;
+export class Matchmaker extends DurableObject {
   queue: QueuedPlayer[] = [];
 
-  constructor(state: DurableObjectState, _env: unknown) {
-    this.state = state;
+  constructor(ctx: DurableObjectState, env: unknown) {
+    super(ctx, env);
   }
 
   async fetch(request: Request): Promise<Response> {

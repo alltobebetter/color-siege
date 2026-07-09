@@ -1,7 +1,7 @@
-/// <reference types="@cloudflare/workers-types" />
+import { GameRoom } from "./game-room";
+import { Matchmaker } from "./matchmaker";
 
-export { GameRoom } from "./game-room";
-export { Matchmaker } from "./matchmaker";
+export { GameRoom, Matchmaker };
 
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;

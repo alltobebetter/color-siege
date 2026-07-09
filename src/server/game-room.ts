@@ -1,5 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
-
+import { DurableObject } from "cloudflare:workers";
 import {
   createInitialState,
   createPlayer,
@@ -26,9 +25,8 @@ interface ConnInfo {
   color: PlayerColor | null;
 }
 
-export class GameRoom {
-  state: GameState;
-  state2: DurableObjectState;
+export class GameRoom extends DurableObject {
+  gameState: GameState;
   tickTimer: ReturnType<typeof setInterval> | null = null;
   broadcastTimer: ReturnType<typeof setInterval> | null = null;
   endCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -40,9 +38,9 @@ export class GameRoom {
   // color → 重连超时计时器
   reconnectTimeouts: Map<PlayerColor, ReturnType<typeof setTimeout>> = new Map();
 
-  constructor(state: DurableObjectState, _env: unknown) {
-    this.state2 = state;
-    this.state = createInitialState();
+  constructor(ctx: DurableObjectState, env: unknown) {
+    super(ctx, env);
+    this.gameState = createInitialState();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -130,7 +128,7 @@ export class GameRoom {
       connInfo.color = color;
 
       // 更新玩家对象的 id
-      const player = this.state.players[color];
+      const player = this.gameState.players[color];
       if (player) {
         player.id = id;
       }
@@ -142,8 +140,8 @@ export class GameRoom {
 
     // 新玩家 — 找空位
     let color: PlayerColor | null = null;
-    if (!this.state.players[1]) color = 1;
-    else if (!this.state.players[2]) color = 2;
+    if (!this.gameState.players[1]) color = 1;
+    else if (!this.gameState.players[2]) color = 2;
 
     if (color === null) {
       this.sendTo(ws, { type: "error", message: "房间已满" });
@@ -151,13 +149,13 @@ export class GameRoom {
     }
 
     // 游戏进行中不允许新玩家加入（但允许重连，上面已处理）
-    if (this.state.status === "playing" || this.state.status === "countdown") {
+    if (this.gameState.status === "playing" || this.gameState.status === "countdown") {
       this.sendTo(ws, { type: "error", message: "游戏已开始" });
       return;
     }
 
     const player = createPlayer(id, color, cleanName);
-    this.state.players[color] = player;
+    this.gameState.players[color] = player;
     connInfo.color = color;
     this.playerNames.set(cleanName, color);
 
@@ -170,16 +168,16 @@ export class GameRoom {
     if (!connInfo || connInfo.color === null) return;
 
     const color = connInfo.color;
-    const player = this.state.players[color];
+    const player = this.gameState.players[color];
     if (!player) return;
-    if (this.state.status !== "waiting") return;
+    if (this.gameState.status !== "waiting") return;
 
     player.ready = true;
 
-    const p1 = this.state.players[1];
-    const p2 = this.state.players[2];
+    const p1 = this.gameState.players[1];
+    const p2 = this.gameState.players[2];
     if (p1?.ready && p2?.ready) {
-      startCountdown(this.state);
+      startCountdown(this.gameState);
       this.startGameLoop();
     }
 
@@ -189,13 +187,13 @@ export class GameRoom {
   handleMove(ws: WebSocket, dir: any) {
     const connInfo = this.connections.get(ws);
     if (!connInfo || connInfo.color === null) return;
-    movePlayer(this.state, connInfo.color, dir);
+    movePlayer(this.gameState, connInfo.color, dir);
   }
 
   handleSkill(ws: WebSocket, skill: any) {
     const connInfo = this.connections.get(ws);
     if (!connInfo || connInfo.color === null) return;
-    useSkill(this.state, connInfo.color, skill);
+    useSkill(this.gameState, connInfo.color, skill);
   }
 
   handleLeave(ws: WebSocket) {
@@ -209,10 +207,10 @@ export class GameRoom {
 
     if (color === null) return;
 
-    const player = this.state.players[color];
+    const player = this.gameState.players[color];
     if (!player) return;
 
-    if (this.state.status === "playing" || this.state.status === "countdown") {
+    if (this.gameState.status === "playing" || this.gameState.status === "countdown") {
       // 游戏中断线 — 给宽限期重连，不立即移除玩家
       const playerName = player.name;
       const timeout = setTimeout(() => {
@@ -227,10 +225,10 @@ export class GameRoom {
         if (reconnected) return;
 
         // 未重连 — 移除玩家，结束游戏
-        this.state.players[color] = null;
+        this.gameState.players[color] = null;
         this.playerNames.delete(playerName);
-        this.state.status = "ended";
-        this.state.winner = color === 1 ? 2 : 1;
+        this.gameState.status = "ended";
+        this.gameState.winner = color === 1 ? 2 : 1;
         this.stopGameLoop();
         this.broadcast();
       }, RECONNECT_GRACE);
@@ -239,7 +237,7 @@ export class GameRoom {
     } else {
       // 非游戏中 — 立即移除
       this.playerNames.delete(player.name);
-      this.state.players[color] = null;
+      this.gameState.players[color] = null;
     }
 
     this.broadcast();
@@ -255,7 +253,7 @@ export class GameRoom {
     if (this.endCheckTimer) clearInterval(this.endCheckTimer);
 
     this.tickTimer = setInterval(() => {
-      gameTick(this.state);
+      gameTick(this.gameState);
     }, TICK_INTERVAL);
 
     this.broadcastTimer = setInterval(() => {
@@ -263,7 +261,7 @@ export class GameRoom {
     }, BROADCAST_INTERVAL);
 
     this.endCheckTimer = setInterval(() => {
-      if (this.state.status === "ended") {
+      if (this.gameState.status === "ended") {
         this.stopGameLoop();
         this.broadcast();
       }
@@ -288,7 +286,7 @@ export class GameRoom {
   broadcast() {
     const msg: ServerMessage = {
       type: "state",
-      state: serializeState(this.state),
+      state: serializeState(this.gameState),
     };
     const data = JSON.stringify(msg);
     for (const ws of this.connections.keys()) {
