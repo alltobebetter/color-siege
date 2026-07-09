@@ -1,0 +1,8 @@
+{
+  "name": "color-siege",
+  "main": "src/party/server.ts",
+  "parties": {
+    "matchmaker": "src/party/matchmaker.ts"
+  },
+  "compatibilityDate": "2024-07-01"
+}

@@ -1,0 +1,116 @@
+@import url("https://fontsapi.zeoseven.com/572/main/result.css");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #0e0e12;
+  --surface: #18181f;
+  --surface-2: #20202a;
+  --border: #2a2a36;
+  --text: #d4d4dc;
+  --text-dim: #6b6b78;
+  --p1: #e8475a;
+  --p2: #4a6cf7;
+  --accent: #c8c8d4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Unifont", monospace;
+  font-weight: normal;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* 卡片 */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* 输入框 */
+.input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus {
+  border-color: #4a4a5a;
+}
+.input::placeholder {
+  color: #454552;
+}
+
+/* 按钮 */
+.btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn:hover {
+  background: #28283a;
+  border-color: #3a3a4a;
+}
+.btn:active {
+  background: #1e1e2a;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-p1 {
+  background: var(--p1);
+  border: 1px solid var(--p1);
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.btn-p1:hover { filter: brightness(1.1); }
+.btn-p1:active { filter: brightness(0.95); }
+.btn-p1:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-p2 {
+  background: var(--p2);
+  border: 1px solid var(--p2);
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.btn-p2:hover { filter: brightness(1.1); }
+.btn-p2:active { filter: brightness(0.95); }
+.btn-p2:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 技能按钮 */
+.skill-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.skill-btn:hover:not(:disabled) {
+  border-color: #4a4a5a;
+}
+.skill-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
