@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { generateId, signToken } from "@/lib/auth";
+import { NextResponse } from "next/server";
+import { generateId, signToken, setAuthCookie } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,11 +31,6 @@ export async function POST() {
     nickname,
     token,
   });
-  res.cookies.set("token", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 游客 7 天
-    path: "/",
-  });
+  setAuthCookie(res, token, 60 * 60 * 24 * 7); // 游客 7 天
   return res;
 }

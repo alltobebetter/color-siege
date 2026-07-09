@@ -24,15 +24,12 @@ import {
 } from "./grid";
 import type {
   GameState,
-  Grid,
   PlayerColor,
   PlayerState,
   Direction,
   SkillType,
   PowerUp,
-  Effect,
   SerializedState,
-  ScoreInfo,
 } from "./types";
 
 let effectIdCounter = 0;
@@ -469,9 +466,4 @@ export function startCountdown(state: GameState): void {
       p.shieldUntil = 0;
     }
   }
-}
-
-/** 获取分数 */
-export function getScores(state: GameState): ScoreInfo {
-  return countScores(state.grid);
 }

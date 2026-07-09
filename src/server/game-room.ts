@@ -13,6 +13,8 @@ import type {
   PlayerColor,
   ClientMessage,
   ServerMessage,
+  Direction,
+  SkillType,
 } from "../game/types";
 
 const TICK_INTERVAL = 100;
@@ -184,13 +186,13 @@ export class GameRoom extends DurableObject {
     this.broadcast();
   }
 
-  handleMove(ws: WebSocket, dir: any) {
+  handleMove(ws: WebSocket, dir: Direction) {
     const connInfo = this.connections.get(ws);
     if (!connInfo || connInfo.color === null) return;
     movePlayer(this.gameState, connInfo.color, dir);
   }
 
-  handleSkill(ws: WebSocket, skill: any) {
+  handleSkill(ws: WebSocket, skill: SkillType) {
     const connInfo = this.connections.get(ws);
     if (!connInfo || connInfo.color === null) return;
     useSkill(this.gameState, connInfo.color, skill);

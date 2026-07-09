@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { createHash, randomBytes, createHmac } from "crypto";
 
 /**
@@ -124,4 +125,14 @@ export function getUserFromRequest(
   }
 
   return null;
+}
+
+/** 设置认证 cookie 到 NextResponse */
+export function setAuthCookie(res: NextResponse, token: string, maxAge: number): void {
+  res.cookies.set("token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge,
+    path: "/",
+  });
 }

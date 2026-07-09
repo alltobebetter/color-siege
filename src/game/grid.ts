@@ -134,18 +134,3 @@ export function countScores(grid: Grid): ScoreInfo {
   }
   return { p1Count, p2Count, totalCells };
 }
-
-/** 网格深拷贝 */
-export function cloneGrid(grid: Grid): Grid {
-  return grid.map((row) => [...row]);
-}
-
-/** 序列化网格 */
-export function serializeGrid(grid: Grid): number[][] {
-  return grid.map((row) => row.map((c) => c as number));
-}
-
-/** 反序列化网格 */
-export function deserializeGrid(data: number[][]): Grid {
-  return data.map((row) => row.map((c) => c as CellOwner));
-}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, initDb } from "@/lib/db";
-import { hashPassword, generateId, signToken } from "@/lib/auth";
+import { hashPassword, generateId, signToken, setAuthCookie } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,12 +58,7 @@ export async function POST(req: NextRequest) {
       nickname,
       token,
     });
-    res.cookies.set("token", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 天
-      path: "/",
-    });
+    setAuthCookie(res, token, 60 * 60 * 24 * 30); // 30 天
     return res;
   } catch (err) {
     console.error("Register error:", err);
