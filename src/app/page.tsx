@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // 已登录的用户直接跳大厅
   useEffect(() => {
@@ -18,9 +19,11 @@ export default function LoginPage() {
       .then((data) => {
         if (data.user) {
           router.push("/lobby");
+        } else {
+          setAuthChecked(true);
         }
       })
-      .catch(() => {});
+      .catch(() => setAuthChecked(true));
   }, [router]);
 
   const handleSubmit = useCallback(
@@ -75,6 +78,15 @@ export default function LoginPage() {
       setLoading(false);
     }
   }, [router]);
+
+  // 等待登录状态检查完成
+  if (!authChecked) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-xs text-text-dim">加载中</div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
