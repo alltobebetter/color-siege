@@ -120,8 +120,10 @@ export default function LobbyPage() {
             </h1>
             <p className="text-xs text-text-dim">
               <span style={{ color: "#4a6cf7" }}>{user.nickname}</span>
-              {user.isGuest && (
+              {user.isGuest ? (
                 <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] bg-surface2 text-text-dim">游客</span>
+              ) : (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "rgba(74,108,247,0.15)", color: "#4a6cf7" }}>注册</span>
               )}
             </p>
           </div>
