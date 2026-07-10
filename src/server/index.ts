@@ -13,13 +13,13 @@ export default {
     const url = new URL(request.url);
 
     // 健康检查
-    if (url.pathname === "/") {
+    if (url.pathname === "/ws" || url.pathname === "/ws/") {
       return new Response("Color Siege server is running!", { status: 200 });
     }
 
-    // 游戏房间 WebSocket: /room/{roomId}
-    if (url.pathname.startsWith("/room/")) {
-      const roomId = url.pathname.split("/")[2];
+    // 游戏房间 WebSocket: /ws/room/{roomId}
+    if (url.pathname.startsWith("/ws/room/")) {
+      const roomId = url.pathname.split("/")[3];
       if (!roomId) {
         return new Response("Missing roomId", { status: 400 });
       }
@@ -28,8 +28,8 @@ export default {
       return stub.fetch(request);
     }
 
-    // 匹配服务器 WebSocket: /matchmaker
-    if (url.pathname === "/matchmaker") {
+    // 匹配服务器 WebSocket: /ws/matchmaker
+    if (url.pathname === "/ws/matchmaker") {
       const id = env.MATCHMAKER.idFromName("lobby");
       const stub = env.MATCHMAKER.get(id);
       return stub.fetch(request);

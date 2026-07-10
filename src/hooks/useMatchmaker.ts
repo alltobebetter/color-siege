@@ -20,7 +20,7 @@ export function useMatchmaker() {
     setResult(null);
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${WS_HOST}/matchmaker`);
+    const socket = new WebSocket(`${protocol}//${WS_HOST}/ws/matchmaker`);
 
     socket.addEventListener("open", () => {
       socket.send(JSON.stringify({ type: "queue", name }));

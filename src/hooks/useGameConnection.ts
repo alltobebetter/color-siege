@@ -30,7 +30,7 @@ export function useGameConnection(roomId: string, playerName: string): GameConne
     hasConnectedRef.current = true;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${WS_HOST}/room/${roomId}`);
+    const socket = new WebSocket(`${protocol}//${WS_HOST}/ws/room/${roomId}`);
 
     const doJoin = () => {
       setConnected(true);
