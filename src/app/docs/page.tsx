@@ -4,19 +4,19 @@ export default function DocsPage() {
       title: "如何游玩",
       href: "/docs/how-to-play",
       desc: "基础操作、技能系统、围地机制、进阶技巧",
-      icon: "▶",
+      icon: "📄",
     },
     {
       title: "隐私政策",
       href: "/docs/privacy",
       desc: "我们如何收集、使用和保护您的信息",
-      icon: "◆",
+      icon: "📄",
     },
     {
       title: "服务条款",
       href: "/docs/terms",
       desc: "使用本游戏需要遵守的规则和条款",
-      icon: "■",
+      icon: "📄",
     },
   ];
 
