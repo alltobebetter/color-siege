@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, Suspense } from "rea
 import { useParams, useRouter } from "next/navigation";
 import { useGameConnection } from "@/hooks/useGameConnection";
 import { GameRenderer } from "@/game/renderer";
-import { SKILL_COOLDOWNS } from "@/game/constants";
-import type { ClientMessage, Direction, SkillType } from "@/game/types";
+import { SKILL_COOLDOWNS, MOVE_COOLDOWN, DIR_VECTORS } from "@/game/constants";
+import type { ClientMessage, Direction, SkillType, SerializedState, PlayerColor } from "@/game/types";
 
 const P1_COLOR = "#e8475a";
 const P2_COLOR = "#4a6cf7";
@@ -40,17 +40,98 @@ function GameContent() {
   const rendererRef = useRef<GameRenderer | null>(null);
   const [, forceTick] = useState(0);
 
+  // ===== 客户端预测 =====
+  // predictedState 是在服务器状态基础上应用本地移动后的状态
+  const predictedStateRef = useRef<SerializedState | null>(null);
+  const lastMoveTimeRef = useRef(0);
+  const pendingMovesRef = useRef<Array<{ seq: number; dir: Direction }>>([]);
+  const seqRef = useRef(0);
+  const serverStateRef = useRef<SerializedState | null>(null);
+  const myColorRef = useRef<PlayerColor | null>(null);
+  myColorRef.current = myColor;
+
+  // 服务器状态到达时，重新应用未确认的移动
+  useEffect(() => {
+    if (!state) return;
+    serverStateRef.current = state;
+
+    // 以服务器状态为基准，重新应用未确认的移动
+    const predicted = JSON.parse(JSON.stringify(state)) as SerializedState;
+    const color = myColorRef.current;
+    if (color && predicted.players[color]) {
+      for (const move of pendingMovesRef.current) {
+        const p: SerializedState["players"][PlayerColor] = predicted.players[color]!;
+        if (!p) break;
+        const now = Date.now();
+        if (now < p.moveCooldown) break; // 冷却中，停止重放
+        const { dx, dy } = DIR_VECTORS[move.dir];
+        const nx = p.x + dx;
+        const ny = p.y + dy;
+        // 边界/障碍检查
+        if (nx < 0 || nx >= 20 || ny < 0 || ny >= 20) { p.dir = move.dir; continue; }
+        if (predicted.grid[ny][nx] === -1) { p.dir = move.dir; continue; }
+        p.x = nx;
+        p.y = ny;
+        p.dir = move.dir;
+        p.moveCooldown = now + MOVE_COOLDOWN;
+        predicted.grid[ny][nx] = color;
+      }
+    }
+    predictedStateRef.current = predicted;
+  }, [state]);
+
+  // 本地预测移动
+  const predictMove = useCallback((dir: Direction) => {
+    const color = myColorRef.current;
+    const baseState = predictedStateRef.current || serverStateRef.current;
+    if (!color || !baseState || !baseState.players[color]) return;
+    if (baseState.status !== "playing") return;
+
+    const p = baseState.players[color]!;
+    const now = Date.now();
+    if (now < p.moveCooldown) return; // 冷却中
+
+    // 克隆状态，应用移动
+    const newState = JSON.parse(JSON.stringify(baseState)) as SerializedState;
+    const np = newState.players[color]!;
+    const { dx, dy } = DIR_VECTORS[dir];
+    const nx = np.x + dx;
+    const ny = np.y + dy;
+
+    // 边界/障碍检查
+    if (nx < 0 || nx >= 20 || ny < 0 || ny >= 20 || newState.grid[ny][nx] === -1) {
+      np.dir = dir; // 只改变朝向
+    } else {
+      np.x = nx;
+      np.y = ny;
+      np.dir = dir;
+      np.moveCooldown = now + MOVE_COOLDOWN;
+      newState.grid[ny][nx] = color;
+    }
+
+    predictedStateRef.current = newState;
+
+    // 记录待确认的移动
+    const seq = ++seqRef.current;
+    pendingMovesRef.current.push({ seq, dir });
+    // 保留最近 10 条
+    if (pendingMovesRef.current.length > 10) {
+      pendingMovesRef.current.shift();
+    }
+  }, []);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     rendererRef.current = new GameRenderer(canvasRef.current);
   }, []);
 
-  // 渲染循环 — 独立于 state 更新，保证 60fps
+  // 渲染循环 — 使用预测状态，独立于 state 更新，保证 60fps
   useEffect(() => {
     let raf = 0;
     const loop = () => {
       if (rendererRef.current) {
-        rendererRef.current.render(state, myColor);
+        const renderState = predictedStateRef.current || state;
+        rendererRef.current.render(renderState, myColor);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -64,7 +145,7 @@ function GameContent() {
     return () => clearInterval(t);
   }, []);
 
-  // 键盘输入
+  // 键盘输入 — 先本地预测，再发服务器
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
@@ -75,6 +156,7 @@ function GameContent() {
       };
       if (dirMap[key]) {
         e.preventDefault();
+        predictMove(dirMap[key]);
         send({ type: "move", dir: dirMap[key] });
       }
 
@@ -90,7 +172,7 @@ function GameContent() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [send]);
+  }, [send, predictMove]);
 
   const handleReady = useCallback(() => send({ type: "ready" }), [send]);
   const handleSkill = useCallback(
@@ -103,9 +185,10 @@ function GameContent() {
   }, [send, router]);
 
   const scores = useMemo(() => {
-    if (!state) return { p1: 0, p2: 0, total: 0 };
+    const s = predictedStateRef.current || state;
+    if (!s) return { p1: 0, p2: 0, total: 0 };
     let p1 = 0, p2 = 0, total = 0;
-    for (const row of state.grid) {
+    for (const row of s.grid) {
       for (const cell of row) {
         if (cell === 1) p1++;
         else if (cell === 2) p2++;
@@ -113,12 +196,13 @@ function GameContent() {
       }
     }
     return { p1, p2, total };
-  }, [state]);
+  }, [state, predictedStateRef.current]);
 
   const gameTimeLeft = useMemo(() => {
-    if (!state || state.status !== "playing") return 0;
-    return Math.max(0, Math.ceil((state.endTime - Date.now()) / 1000));
-  }, [state]);
+    const s = predictedStateRef.current || state;
+    if (!s || s.status !== "playing") return 0;
+    return Math.max(0, Math.ceil((s.endTime - Date.now()) / 1000));
+  }, [state, predictedStateRef.current]);
 
   if (error) {
     return (
@@ -133,7 +217,8 @@ function GameContent() {
     );
   }
 
-  const myPlayer = myColor ? state?.players[myColor] : null;
+  const displayState = predictedStateRef.current || state;
+  const myPlayer = myColor ? displayState?.players[myColor] : null;
   const mySkillCDs = myPlayer?.skillCooldowns ?? { dash: 0, bomb: 0, shield: 0 };
 
   return (

@@ -12,6 +12,12 @@ export class GameRenderer {
   ctx: CanvasRenderingContext2D;
   canvas: HTMLCanvasElement;
 
+  // 玩家位置插值
+  private lastPlayerPos: Map<number, { x: number; y: number }> = new Map();
+  private interpFrom: Map<number, { x: number; y: number }> = new Map();
+  private interpStart: Map<number, number> = new Map();
+  private readonly INTERP_DURATION = 120; // ms — 略小于移动冷却
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.canvas.width = CANVAS_SIZE;
@@ -118,11 +124,47 @@ export class GameRenderer {
       this.drawEffect(eff, age);
     }
 
-    // 玩家
+    // 玩家 — 带位置插值
     for (let c = 1 as PlayerColor; c <= 2; c = (c + 1) as PlayerColor) {
       const p = state.players[c as 1 | 2];
       if (!p) continue;
-      this.drawPlayer(p.x, p.y, c as PlayerColor, p.shieldUntil > now, p.dir);
+
+      // 更新位置追踪
+      const last = this.lastPlayerPos.get(c);
+      if (!last) {
+        this.lastPlayerPos.set(c, { x: p.x, y: p.y });
+      } else if (last.x !== p.x || last.y !== p.y) {
+        const dist = Math.abs(p.x - last.x) + Math.abs(p.y - last.y);
+        if (dist > 1) {
+          // 冲刺/瞬移 — 不插值，直接跳
+          this.interpFrom.delete(c);
+          this.interpStart.delete(c);
+        } else {
+          // 普通移动 — 启动插值
+          this.interpFrom.set(c, { x: last.x, y: last.y });
+          this.interpStart.set(c, now);
+        }
+        this.lastPlayerPos.set(c, { x: p.x, y: p.y });
+      }
+
+      // 计算插值位置
+      let renderX = p.x;
+      let renderY = p.y;
+      const from = this.interpFrom.get(c);
+      const start = this.interpStart.get(c);
+      if (from && start) {
+        const elapsed = now - start;
+        if (elapsed >= this.INTERP_DURATION) {
+          this.interpFrom.delete(c);
+          this.interpStart.delete(c);
+        } else {
+          const t = elapsed / this.INTERP_DURATION;
+          renderX = from.x + (p.x - from.x) * t;
+          renderY = from.y + (p.y - from.y) * t;
+        }
+      }
+
+      this.drawPlayer(renderX, renderY, c as PlayerColor, p.shieldUntil > now, p.dir);
     }
 
     // 状态遮罩
