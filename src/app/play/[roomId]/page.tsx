@@ -41,46 +41,47 @@ function GameContent() {
   const [, forceTick] = useState(0);
 
   // ===== 客户端预测 =====
-  // predictedState 是在服务器状态基础上应用本地移动后的状态
+  // predictedState 是在服务器状态基础上，保留本地预测的玩家位置
   const predictedStateRef = useRef<SerializedState | null>(null);
-  const lastMoveTimeRef = useRef(0);
-  const pendingMovesRef = useRef<Array<{ seq: number; dir: Direction }>>([]);
-  const seqRef = useRef(0);
+  const pendingMovesRef = useRef<number>(0); // 未确认的移动数量
+  const lastPredictedPos = useRef<{ x: number; y: number; dir: Direction; moveCooldown: number } | null>(null);
   const serverStateRef = useRef<SerializedState | null>(null);
   const myColorRef = useRef<PlayerColor | null>(null);
   myColorRef.current = myColor;
 
-  // 服务器状态到达时，重新应用未确认的移动
+  // 服务器状态到达时：用服务器状态作为基准，但如果服务器还没追上本地预测，保留预测位置
   useEffect(() => {
     if (!state) return;
     serverStateRef.current = state;
 
-    // 以服务器状态为基准，重新应用未确认的移动
-    const predicted = JSON.parse(JSON.stringify(state)) as SerializedState;
     const color = myColorRef.current;
-    if (color && predicted.players[color]) {
-      for (const move of pendingMovesRef.current) {
-        const p: SerializedState["players"][PlayerColor] = predicted.players[color]!;
-        if (!p) break;
-        const now = Date.now();
-        if (now < p.moveCooldown) break; // 冷却中，停止重放
-        const { dx, dy } = DIR_VECTORS[move.dir];
-        const nx = p.x + dx;
-        const ny = p.y + dy;
-        // 边界/障碍检查
-        if (nx < 0 || nx >= 20 || ny < 0 || ny >= 20) { p.dir = move.dir; continue; }
-        if (predicted.grid[ny][nx] === -1) { p.dir = move.dir; continue; }
-        p.x = nx;
-        p.y = ny;
-        p.dir = move.dir;
-        p.moveCooldown = now + MOVE_COOLDOWN;
-        predicted.grid[ny][nx] = color;
+    const predicted = JSON.parse(JSON.stringify(state)) as SerializedState;
+
+    if (color && predicted.players[color] && lastPredictedPos.current) {
+      const serverPlayer = predicted.players[color]!;
+      const localPos = lastPredictedPos.current;
+
+      if (serverPlayer.x === localPos.x && serverPlayer.y === localPos.y) {
+        // 服务器已追上 — 清除预测
+        pendingMovesRef.current = 0;
+        lastPredictedPos.current = null;
+      } else if (pendingMovesRef.current > 0) {
+        // 服务器还没追上 — 保留本地预测位置，但用服务器的 grid/对手等数据
+        predicted.players[color]!.x = localPos.x;
+        predicted.players[color]!.y = localPos.y;
+        predicted.players[color]!.dir = localPos.dir;
+        predicted.players[color]!.moveCooldown = localPos.moveCooldown;
+        // 确保预测位置格子被涂色
+        if (predicted.grid[localPos.y]?.[localPos.x] !== -1) {
+          predicted.grid[localPos.y][localPos.x] = color;
+        }
       }
     }
+
     predictedStateRef.current = predicted;
   }, [state]);
 
-  // 本地预测移动
+  // 本地预测移动 — 只更新位置，不重放历史
   const predictMove = useCallback((dir: Direction) => {
     const color = myColorRef.current;
     const baseState = predictedStateRef.current || serverStateRef.current;
@@ -109,15 +110,11 @@ function GameContent() {
       newState.grid[ny][nx] = color;
     }
 
-    predictedStateRef.current = newState;
+    // 记录预测位置
+    lastPredictedPos.current = { x: np.x, y: np.y, dir: np.dir, moveCooldown: np.moveCooldown };
+    pendingMovesRef.current++;
 
-    // 记录待确认的移动
-    const seq = ++seqRef.current;
-    pendingMovesRef.current.push({ seq, dir });
-    // 保留最近 10 条
-    if (pendingMovesRef.current.length > 10) {
-      pendingMovesRef.current.shift();
-    }
+    predictedStateRef.current = newState;
   }, []);
 
   useEffect(() => {
