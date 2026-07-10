@@ -8,6 +8,8 @@ import {
   gameTick,
   serializeState,
 } from "../game/engine";
+import { getBotAction } from "../game/bot";
+import type { BotDifficulty } from "../game/bot";
 import type {
   GameState,
   PlayerColor,
@@ -20,6 +22,7 @@ import type {
 const TICK_INTERVAL = 100;
 const BROADCAST_INTERVAL = 50;
 const RECONNECT_GRACE = 15_000;
+const BOT_TICK_INTERVAL = 150;
 
 interface ConnInfo {
   id: string;
@@ -32,6 +35,7 @@ export class GameRoom extends DurableObject {
   tickTimer: ReturnType<typeof setInterval> | null = null;
   broadcastTimer: ReturnType<typeof setInterval> | null = null;
   endCheckTimer: ReturnType<typeof setInterval> | null = null;
+  botTimer: ReturnType<typeof setInterval> | null = null;
 
   // ws → ConnInfo
   connections: Map<WebSocket, ConnInfo> = new Map();
@@ -40,12 +44,29 @@ export class GameRoom extends DurableObject {
   // color → 重连超时计时器
   reconnectTimeouts: Map<PlayerColor, ReturnType<typeof setTimeout>> = new Map();
 
+  // AI Bot 相关（通过 DO 内部通信预设，前端完全不知情）
+  botDifficulty: BotDifficulty | null = null;
+  botName: string | null = null;
+  botColor: PlayerColor | null = null;
+
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env);
     this.gameState = createInitialState();
   }
 
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    // 内部接口：预设 AI 配置（由 Matchmaker 调用）
+    if (url.pathname === "/ai-setup" && request.method === "POST") {
+      try {
+        const data = await request.json() as { difficulty: BotDifficulty; botName: string };
+        this.botDifficulty = data.difficulty;
+        this.botName = data.botName;
+      } catch {}
+      return new Response("OK");
+    }
+
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader !== "websocket") {
       return new Response("Expected WebSocket", { status: 426 });
@@ -162,6 +183,17 @@ export class GameRoom extends DurableObject {
     this.playerNames.set(cleanName, color);
 
     this.sendTo(ws, { type: "joined", color, name: cleanName });
+
+    // 如果有 AI 配置（由 Matchmaker 预设），自动创建 AI 对手
+    if (this.botDifficulty && this.botName && this.botColor === null) {
+      const botColor: PlayerColor = color === 1 ? 2 : 1;
+      this.botColor = botColor;
+      const bot = createPlayer("bot", botColor, this.botName);
+      bot.ready = true; // AI 自动准备
+      this.gameState.players[botColor] = bot;
+      this.playerNames.set(this.botName, botColor);
+    }
+
     this.broadcast();
   }
 
@@ -212,6 +244,15 @@ export class GameRoom extends DurableObject {
     const player = this.gameState.players[color];
     if (!player) return;
 
+    // 如果是 AI 房间，人类离开 → 直接结束
+    if (this.botDifficulty && color !== this.botColor) {
+      this.gameState.status = "ended";
+      this.gameState.winner = this.botColor;
+      this.stopGameLoop();
+      this.broadcast();
+      return;
+    }
+
     if (this.gameState.status === "playing" || this.gameState.status === "countdown") {
       // 游戏中断线 — 给宽限期重连，不立即移除玩家
       const playerName = player.name;
@@ -253,6 +294,7 @@ export class GameRoom extends DurableObject {
     if (this.tickTimer) clearInterval(this.tickTimer);
     if (this.broadcastTimer) clearInterval(this.broadcastTimer);
     if (this.endCheckTimer) clearInterval(this.endCheckTimer);
+    if (this.botTimer) clearInterval(this.botTimer);
 
     this.tickTimer = setInterval(() => {
       gameTick(this.gameState);
@@ -268,6 +310,32 @@ export class GameRoom extends DurableObject {
         this.broadcast();
       }
     }, 500);
+
+    // AI Bot 定时决策
+    if (this.botDifficulty && this.botColor !== null) {
+      this.botTimer = setInterval(() => {
+        this.runBot();
+      }, BOT_TICK_INTERVAL);
+    }
+  }
+
+  /** AI Bot 执行决策 */
+  runBot() {
+    if (this.gameState.status !== "playing") return;
+    if (!this.botDifficulty || this.botColor === null) return;
+
+    const botPlayer = this.gameState.players[this.botColor];
+    if (!botPlayer) return;
+
+    const action = getBotAction(this.gameState, this.botColor, this.botDifficulty);
+
+    if (action.skill) {
+      useSkill(this.gameState, this.botColor, action.skill);
+    }
+
+    if (action.move) {
+      movePlayer(this.gameState, this.botColor, action.move);
+    }
   }
 
   stopGameLoop() {
@@ -282,6 +350,10 @@ export class GameRoom extends DurableObject {
     if (this.endCheckTimer) {
       clearInterval(this.endCheckTimer);
       this.endCheckTimer = null;
+    }
+    if (this.botTimer) {
+      clearInterval(this.botTimer);
+      this.botTimer = null;
     }
   }
 
